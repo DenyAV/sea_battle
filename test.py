@@ -13,4 +13,4 @@ def __possible_ships_areas(decks_num, size):
     return ships_areas
 
 
-print(__possible_ships_areas(3, 6))
+print(__possible_ships_areas(2, 6))
