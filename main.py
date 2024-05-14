@@ -46,6 +46,12 @@ class Cell:
     def __set_status(self, status: str):
         self.__status = status
 
+    def hit(self, row, col):
+        if (self.__row == row) and (self.__col == col):
+            return True
+        else:
+            return False
+
     @property
     def status(self):
         return self.__status
@@ -152,13 +158,21 @@ class Field:
         else: self.__ships_list = ships_list
 
     def __fill_cells(self, size):
+        """
+        Функция автоматически заполняет все пространство игрового поля объектами Cell
+        при создании объекта Field
+        :param size: Константа - размер игрового поля
+        :return: None
+        """
         self.__size = size
         self.__ships_area_list = []
 
         for x in range(1, size+1):
+            row_list = []
             for y in range(1, size+1):
                 cell = Cell(x, y)
-                self.__ships_area_list.append(cell)
+                row_list.append(cell)
+            self.__ships_area_list.append(row_list)
 
     def add_ship(self, ship):
         self.__ships_list.append(ship)
@@ -171,19 +185,6 @@ class Field:
     def ships_area_list(self):
         return self.__ships_area_list
 
-    def show(self):
-        field_size = [[" "] * 6 for i in range(6)]
-
-        # field_size[1][1] = '*'
-
-        print()
-        print("    | 1 | 2 | 3 | 4 | 5 | 6 |")
-        print("  --------------------------- ")
-        for i, row in enumerate(field_size):
-            row_str = f"  {i + 1} | {' | '.join(row)} | "
-            print(row_str)
-            print("  --------------------------- ")
-        print()
 
 class HumansField(Field):
     """
@@ -222,13 +223,50 @@ class HumansField(Field):
         return False
 
     def __possible_ships_areas(self, decks_num):
+        """
+        Функция определяет доступные группы ячеек, в которые может поместиться корабль с требуемым количеством палуб
+        :param decks_num: количество палуб (ячеек). Определяет размер корабля, который нужно поместить в поле
+        :return: Список списков. Каждый вложенный список представляет собой набор рядом расположенных объектов cell,
+        подходящих для размещения корабля требуемого размера, т.е. свободных ячеек, не занятых другими кораблями
+        и не граничащих с другими кораблями
+        """
 
+        size = Game.FIELD_SIZE()
         ships_areas = []
 
-        for x in range(1, Game.FIELD_SIZE()+1):
-            for offset in range(1, Game.FIELD_SIZE() - decks_num + 4):
+        for x in range(1, size + 1):
+            # Вводим смещение - т.е. потенциальную группу ячеек, которую проверяем на предмет того, свободны ли они
+            # Если все объекты в смещении свободны - добавляем смещение в виде списка в список доступных групп
+            for offset in range(1, size - decks_num + 2):
+                area = []
                 for y in range(offset, offset + decks_num):
-                    sell =
+                    cell = self.ships_area_list[x][y]
+                    # Добавляем ячейку в список только если статус у нее пустой, т.е. ячейка свободна
+                    if cell.status == ' ':
+                        area.append(cell)
+
+                # Добавляем список ячеек в общий массив свободных зон только если все ячейки в смещении свободны,
+                # т.е. в них влазит корабль требуемого размера
+                if len(area) == decks_num:
+                    ships_areas.append(area)
+
+        # Если количество палуб > 1, то проходимся также и по колонкам, поскольку корабли могут быть и вертикальными
+        if decks_num > 1:
+            for y in range(1, size + 1):
+                for offset in range(1, size - decks_num + 2):
+                    area = []
+                    for x in range(offset, offset + decks_num):
+                        cell = self.ships_area_list[x][y]
+                        # Добавляем ячейку в список только если статус у нее пустой, т.е. ячейка свободна
+                        if cell.status == ' ':
+                            area.append(cell)
+
+                    # Добавляем список ячеек в общий массив свободных зон только если все ячейки в смещении свободны,
+                    # т.е. в них влазит корабль требуемого размера
+                    if len(area) == decks_num:
+                        ships_areas.append(area)
+
+        return ships_areas
 
     def __remove_used_ship_area(self, cell):
 
@@ -255,6 +293,7 @@ class HumansField(Field):
         print(f'Cоздаем {decks_num_str} корабль:')
 
         created_decks = 0  # Количество созданных палуб корабля
+        ships_areas = self.__possible_ships_areas(decks_num) #Список всех доступных зон размещения корабля указанного размера
         while created_decks < decks_num:
 
             # Создаваемая в данный момент палуба корабля
@@ -286,8 +325,20 @@ class HumansField(Field):
                 print(' Координаты вне игрового поля! ')
                 continue
 
+            # Пройдемся по списку доступных зон размещения кораблей и проверим, входит ли выбранная пользователем ячейка
+            # хотя бы в одну зону
+            used_ships_areas = []
+            for area in ships_areas:
+                for cell in area:
+                    if cell.hit(row, col):
+                        used_ships_areas.append(area)
+
+            # Заменим первоначальный список списков тем, которые подходят для данной ячейки.
+            # Далее искать будем только в них
+            ships_areas = used_ships_areas.copy()
+
             # Создаем ячейку
-            cell = Cell(row, col, '*')
+            # cell = Cell(row, col, '*')
 
             # Если это первая палуба
             if self.__check_cells(cell):
