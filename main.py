@@ -201,24 +201,42 @@ class HumansField(Field):
         Заполняет игровое поле кораблями
     """
 
-    def __check_cell(self, cell):
+    def __create_ship_borders(self, ship):
 
-        # Пройдемся по всем палубам всех созданных кораблей
-        for ship in self.ships:
-            for deck in ship.decks:
+        # Пройдемся вокруг всех палуб корабля и отметим соседние ячейки как границу,
+        # в которой ставить другие корабли нельзя
 
-                # Сначала проверим, не пытается ли пользователь поставить палубу в клетку,
-                # которая уже занята другой палубой этого же или другого корабля
-                if deck == cell:
+        for deck in ship.decks:
+            border_row = deck.row - 1
+            border_col = deck.col - 1
+            for x in range(border_row, border_row+3):
+                for y in range(border_col, border_col+3):
+
+                    if x == 0:
+                        xx = 1
+                    elif x > 5:
+                        xx = 5
+                    else:
+                        xx = x - 1
+
+                    if y == 0:
+                        yy = 1
+                    elif y > 5:
+                        yy = 5
+                    else:
+                        yy = y - 1
+
+                    cell = self.ships_area_list[xx][yy]
+                    if cell.status == ' ':
+                        cell.status = '-'
+
+
+    def __check_ships_hit(self, row, col):
+
+        for curr_ship in self.ships:
+            for curr_deck in curr_ship.decks:
+                if curr_deck.hit(row, col):
                     return True
-
-        return False
-
-    def __check_cells(self, cell):
-
-        for used_cell in self.ships_area_list:
-            if used_cell == cell:
-                return True
 
         return False
 
@@ -240,7 +258,7 @@ class HumansField(Field):
             for offset in range(1, size - decks_num + 2):
                 area = []
                 for y in range(offset, offset + decks_num):
-                    cell = self.ships_area_list[x][y]
+                    cell = self.ships_area_list[x-1][y-1]
                     # Добавляем ячейку в список только если статус у нее пустой, т.е. ячейка свободна
                     if cell.status == ' ':
                         area.append(cell)
@@ -256,7 +274,7 @@ class HumansField(Field):
                 for offset in range(1, size - decks_num + 2):
                     area = []
                     for x in range(offset, offset + decks_num):
-                        cell = self.ships_area_list[x][y]
+                        cell = self.ships_area_list[x-1][y-1]
                         # Добавляем ячейку в список только если статус у нее пустой, т.е. ячейка свободна
                         if cell.status == ' ':
                             area.append(cell)
@@ -267,12 +285,6 @@ class HumansField(Field):
                         ships_areas.append(area)
 
         return ships_areas
-
-    def __remove_used_ship_area(self, cell):
-
-        for i, used_cell in enumerate(self.ships_area_list):
-            if used_cell == cell:
-                self.ships_area_list.pop(i)
 
     def __create_ship(self, decks_num):
 
@@ -325,6 +337,12 @@ class HumansField(Field):
                 print(' Координаты вне игрового поля! ')
                 continue
 
+            # Проверим, не попал ли пользователь в какой-то другой корабль
+            if self.__check_ships_hit(row, col):
+                print('В этой клетке уже стоит палуба корабля или она граничит с какой-то палубой.  Выберите другую')
+                continue
+
+
             # Пройдемся по списку доступных зон размещения кораблей и проверим, входит ли выбранная пользователем ячейка
             # хотя бы в одну зону
             used_ships_areas = []
@@ -333,31 +351,28 @@ class HumansField(Field):
                     if cell.hit(row, col):
                         used_ships_areas.append(area)
 
+            # Если не нашлось ни одной зоны, куда входит ячейка - построить корабль заданного размера в этой точке
+            # невозможно. Предлагаем выбрать правильную точку, которая лежит в заданных зонах
+            if len(used_ships_areas):
+                ship_sell = self.ships_area_list[row-1][col-1]
+                ship_sell.status = '*'
+                ship.add_deck(ship_sell)
+            else:
+                print('В этой клетке нельзя ставить палубу корабля. выберите клетку, соседнюю с уже имеющимися палубами')
+                continue
+
             # Заменим первоначальный список списков тем, которые подходят для данной ячейки.
             # Далее искать будем только в них
             ships_areas = used_ships_areas.copy()
 
-            # Создаем ячейку
-            # cell = Cell(row, col, '*')
-
-            # Если это первая палуба
-            if self.__check_cells(cell):
-                ship.add_deck(cell)
-                self.__remove_used_ship_area(cell)
-
-
-            else:
-                print('В этой клетке уже стоит палуба корабля или она граничит с какой-то палубой.  Выберите другую')
-                continue
-
-            # ship.add_deck(cell)
             created_decks += 1
 
             # Покажем пользователю поле, чтобы он видел, куда ткнул
             game.show_fields()
 
 
-
+        self.__create_ship_borders(ship)
+        game.show_fields()
         print(f'{decks_num_str} корабль создан')
 
 
@@ -369,6 +384,13 @@ class HumansField(Field):
         #Интерактивное создание трехпалубного корабля
         self.__create_ship(3)
 
+        #Интерактивное создание двух двухпалубных кораблей
+        for i in range(2):
+            self.__create_ship(2)
+
+        #Интерактивное создание трех однопалубных кораблей
+        for i in range(3):
+            self.__create_ship(1)
 
 class Game:
     """
@@ -410,12 +432,14 @@ class Game:
         self.__humans_field.fill_ships()
 
     def show_fields(self):
+
+        # Создадим шаблон игрового поля
         field_base = [[" "] * Game.FIELD_SIZE() for i in range(Game.FIELD_SIZE())]
 
-        for ship in self.__humans_field.ships:
-            for deck in ship.decks:
+        for x, ships_row in enumerate(self.__humans_field.ships_area_list):
+            for y, cell in enumerate(ships_row):
                 # поскольку вставлять палубы будем по номерам индексов, то надо отнять 1 от всех координат
-                field_base[deck.row-1][deck.col-1] = deck.status
+                field_base[x][y] = cell.status
 
 
         print('')
