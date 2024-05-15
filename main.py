@@ -185,23 +185,7 @@ class Field:
     def ships_area_list(self):
         return self.__ships_area_list
 
-
-class HumansField(Field):
-    """
-    Представляет собой игровое поле человека
-    Свойства
-    -----------
-    Все свойства такие же, как и у родительского класса
-
-    Методы
-    -----------
-    Методы предполагают интерактивное взаимодействие с пользователем
-
-    fill_ships()
-        Заполняет игровое поле кораблями
-    """
-
-    def __create_ship_borders(self, ship):
+    def create_ship_borders(self, ship):
 
         # Пройдемся вокруг всех палуб корабля и отметим соседние ячейки как границу,
         # в которой ставить другие корабли нельзя
@@ -230,8 +214,7 @@ class HumansField(Field):
                     if cell.status == ' ':
                         cell.status = '-'
 
-
-    def __check_ships_hit(self, row, col):
+    def check_ships_hit(self, row, col):
 
         for curr_ship in self.ships:
             for curr_deck in curr_ship.decks:
@@ -240,7 +223,7 @@ class HumansField(Field):
 
         return False
 
-    def __possible_ships_areas(self, decks_num):
+    def possible_ships_areas(self, decks_num):
         """
         Функция определяет доступные группы ячеек, в которые может поместиться корабль с требуемым количеством палуб
         :param decks_num: количество палуб (ячеек). Определяет размер корабля, который нужно поместить в поле
@@ -286,6 +269,23 @@ class HumansField(Field):
 
         return ships_areas
 
+
+class HumansField(Field):
+    """
+    Представляет собой игровое поле человека
+    Свойства
+    -----------
+    Все свойства такие же, как и у родительского класса
+
+    Методы
+    -----------
+    Методы предполагают интерактивное взаимодействие с пользователем
+
+    fill_ships()
+        Заполняет игровое поле кораблями
+    """
+
+
     def __create_ship(self, decks_num):
 
         # Создаем объект корабля, пока без палуб
@@ -305,7 +305,7 @@ class HumansField(Field):
         print(f'Cоздаем {decks_num_str} корабль:')
 
         created_decks = 0  # Количество созданных палуб корабля
-        ships_areas = self.__possible_ships_areas(decks_num) #Список всех доступных зон размещения корабля указанного размера
+        ships_areas = self.possible_ships_areas(decks_num) #Список всех доступных зон размещения корабля указанного размера
         while created_decks < decks_num:
 
             # Создаваемая в данный момент палуба корабля
@@ -338,7 +338,7 @@ class HumansField(Field):
                 continue
 
             # Проверим, не попал ли пользователь в какой-то другой корабль
-            if self.__check_ships_hit(row, col):
+            if self.check_ships_hit(row, col):
                 print('В этой клетке уже стоит палуба корабля или она граничит с какой-то палубой.  Выберите другую')
                 continue
 
@@ -371,15 +371,13 @@ class HumansField(Field):
             game.show_fields()
 
 
-        self.__create_ship_borders(ship)
+        self.create_ship_borders(ship)
         game.show_fields()
         print(f'{decks_num_str} корабль создан')
 
-
     def fill_ships(self):
-        print('Заполним игровое кораблями')
 
-        # print(self.ships)
+        print('Заполним игровое кораблями')
 
         #Интерактивное создание трехпалубного корабля
         self.__create_ship(3)
@@ -391,6 +389,51 @@ class HumansField(Field):
         #Интерактивное создание трех однопалубных кораблей
         for i in range(3):
             self.__create_ship(1)
+
+        print('Отлично! корабли заняли свои места на поле!')
+
+class SkynetField(Field):
+
+    def __create_ship(self, decks_num):
+
+        # Создаем объект корабля, пока без палуб
+        ship = Ship()
+        # Сразу добавим его в поле
+        self.add_ship(ship)
+
+        # created_decks = 0  # Количество созданных палуб корабля
+        ships_areas = self.possible_ships_areas(decks_num) #Список всех доступных зон размещения корабля указанного размера
+        # while created_decks < decks_num:
+
+        # Выбираем случайно зону, подходящую для размещения корабля
+        # Она и станет кораблем нужного нам размера
+        ship_area = random.choice(ships_areas)
+        for deck in ship_area:
+            deck.status = '*'
+            ship.add_deck(deck)
+
+        self.create_ship_borders(ship)
+
+        # print(f'{decks_num_str} корабль создан')
+
+    def fill_ships(self):
+
+        #Автоматическое создание трехпалубного корабля
+        self.__create_ship(3)
+
+        #Автоматическое создание двух двухпалубных кораблей
+        for i in range(2):
+            self.__create_ship(2)
+
+        #Автоматическое создание трех однопалубных кораблей
+        for i in range(3):
+            self.__create_ship(1)
+
+        print('')
+        print('Компьютер к игре готов!')
+        print('')
+
+        game.show_fields()
 
 class Game:
     """
@@ -413,14 +456,60 @@ class Game:
 
     """
 
+    def __init__(self):
+        pass
+
     # Вводим константу для определения количества полей игрового поля
     @staticmethod
     def FIELD_SIZE():
         return 6
 
-    def __init__(self):
-        pass
+    @staticmethod
+    def greet():
 
+        greet_text = '''
+           Добро пожаловать в игру Морской бой!
+           -----------
+           Тебе предстоит сыграть с компьютером.
+
+           Правила игры:
+           -----------
+           Сначала нужно будет расставить корабли на игровом поле
+           В битве участвует один трехпалубный корабль, два двухпалубных и три однопалубных корабля
+           Корабли должны располагаться на расстоянии как минимум одной клетки друг от друга. 
+
+           Стреляем по очереди с компьютером
+           Чтобы сделать выстрел, нужно ввести координаты клетки, в которую ты стреляешь, в формате: номер строки - пробел - номер колонки
+
+           Побеждает тот, кто первым уничтожит все корабли противника
+
+           Удачи в бою!
+           '''
+
+        print(greet_text)
+
+    def show_fields(self):
+
+        # Создадим шаблон игрового поля
+        indent = ['          ']
+        field_base = [[" "] * Game.FIELD_SIZE() + indent + [" "] * Game.FIELD_SIZE()for i in range(Game.FIELD_SIZE())]
+
+        for x, ships_row in enumerate(self.__skynet_field.ships_area_list):
+            for y, cell in enumerate(ships_row):
+                field_base[x][y] = cell.status
+
+        for x, ships_row in enumerate(self.__skynet_field.ships_area_list):
+            for y, cell in enumerate(ships_row):
+                field_base[x][y+7] = cell.status
+
+        print('     Мое поле                             Поле компьютера')
+        print('    | 1 | 2 | 3 | 4 | 5 | 6 |            | 1 | 2 | 3 | 4 | 5 | 6 |')
+        print('  ---------------------------         ---------------------------- ')
+        for i, row in enumerate(field_base):
+            row_str = f'  {i + 1} | {" | ".join(row)} | '
+            print(row_str)
+            print(' ----------------------------         ---------------------------- ')
+        print('')
 
     def start(self):
 
@@ -428,52 +517,13 @@ class Game:
         Game.greet()
 
         #Создадим игровое поле человека
-        self.__humans_field = HumansField(Game.FIELD_SIZE())
-        self.__humans_field.fill_ships()
+        # self.__humans_field = HumansField(Game.FIELD_SIZE())
+        # self.__humans_field.fill_ships()
 
-    def show_fields(self):
+        # Создадим игровое поле компа
+        self.__skynet_field = SkynetField(Game.FIELD_SIZE())
+        self.__skynet_field.fill_ships()
 
-        # Создадим шаблон игрового поля
-        field_base = [[" "] * Game.FIELD_SIZE() for i in range(Game.FIELD_SIZE())]
-
-        for x, ships_row in enumerate(self.__humans_field.ships_area_list):
-            for y, cell in enumerate(ships_row):
-                # поскольку вставлять палубы будем по номерам индексов, то надо отнять 1 от всех координат
-                field_base[x][y] = cell.status
-
-
-        print('')
-        print('    | 1 | 2 | 3 | 4 | 5 | 6 |')
-        print('  --------------------------- ')
-        for i, row in enumerate(field_base):
-            row_str = f'  {i + 1} | {" | ".join(row)} | '
-            print(row_str)
-            print(' --------------------------- ')
-        print()
-
-    @staticmethod
-    def greet():
-
-        greet_text = '''
-        Добро пожаловать в игру Морской бой!
-        -----------
-        Тебе предстоит сыграть с компьютером.
-        
-        Правила игры:
-        -----------
-        Сначала нужно будет расставить корабли на игровом поле
-        В битве участвует один трехпалубный корабль, два двухпалубных и три однопалубных корабля
-        Корабли должны располагаться на расстоянии как минимум одной клетки друг от друга. 
-        
-        Стреляем по очереди с компьютером
-        Чтобы сделать выстрел, нужно ввести координаты клетки, в которую ты стреляешь, в формате: номер строки - пробел - номер колонки
-        
-        Побеждает тот, кто первым уничтожит все корабли противника
-        
-        Удачи в бою!
-        '''
-
-        print(greet_text)
 
 if __name__ == '__main__':
 
