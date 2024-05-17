@@ -28,9 +28,10 @@ class Cell:
 
     """
 
-    def __init__(self, row=0, col=0, status=' '):
+    def __init__(self, row=0, col=0, status=' ', status_public=' '):
         self.__set_cords(row, col)
         self.__set_status(status)
+        self.__set_status_public(status_public)
 
     def __eq__(self, other):
         return (self.__row == other.__row) and (self.__col == other.__col)
@@ -46,6 +47,9 @@ class Cell:
     def __set_status(self, status: str):
         self.__status = status
 
+    def __set_status_public(self, status_public: str):
+        self.__status_public = status_public
+
     def hit(self, row, col):
         if (self.__row == row) and (self.__col == col):
             return True
@@ -59,6 +63,13 @@ class Cell:
     @status.setter
     def status(self, status):
         self.__set_status(status)
+    @property
+    def status_public(self):
+        return self.__status_public
+
+    @status_public.setter
+    def status_public(self, status_public):
+        self.__status_public = status_public
 
     @property
     def row(self):
@@ -115,7 +126,6 @@ class Ship:
     @property
     def decks(self):
         return self.__decks
-
 
 class Field:
     """
@@ -223,7 +233,7 @@ class Field:
 
         return False
 
-    def possible_ships_areas(self, decks_num):
+    def possible_ships_areas(self, decks_num, public=False):
         """
         Функция определяет доступные группы ячеек, в которые может поместиться корабль с требуемым количеством палуб
         :param decks_num: количество палуб (ячеек). Определяет размер корабля, который нужно поместить в поле
@@ -243,8 +253,14 @@ class Field:
                 for y in range(offset, offset + decks_num):
                     cell = self.ships_area_list[x-1][y-1]
                     # Добавляем ячейку в список только если статус у нее пустой, т.е. ячейка свободна
-                    if cell.status == ' ':
-                        area.append(cell)
+                    # При этом учитываем, внутренний или публичный статус нужно проверять
+                    if public:
+                        if cell.status_public == ' ':
+                            area.append(cell)
+                    else:
+                        if cell.status == ' ':
+                            area.append(cell)
+
 
                 # Добавляем список ячеек в общий массив свободных зон только если все ячейки в смещении свободны,
                 # т.е. в них влазит корабль требуемого размера
@@ -259,8 +275,13 @@ class Field:
                     for x in range(offset, offset + decks_num):
                         cell = self.ships_area_list[x-1][y-1]
                         # Добавляем ячейку в список только если статус у нее пустой, т.е. ячейка свободна
-                        if cell.status == ' ':
-                            area.append(cell)
+                        # При этом учитываем, внутренний или публичный статус нужно проверять
+                        if public:
+                            if cell.status_public == ' ':
+                                area.append(cell)
+                        else:
+                            if cell.status == ' ':
+                                area.append(cell)
 
                     # Добавляем список ячеек в общий массив свободных зон только если все ячейки в смещении свободны,
                     # т.е. в них влазит корабль требуемого размера
@@ -268,7 +289,6 @@ class Field:
                         ships_areas.append(area)
 
         return ships_areas
-
 
 class HumansField(Field):
     """
@@ -285,6 +305,40 @@ class HumansField(Field):
         Заполняет игровое поле кораблями
     """
 
+    def input_cell(self, current_deck=None):
+
+        if current_deck is None:
+            question = 'Ваш ход! укажите координаты выстрела (номер строки - пробел - номер колонки): '
+        else:
+            question = f'Введите координаты {current_deck} палубы корабля (номер строки - пробел - номер колонки): '
+
+        valid_cords = False
+        while not valid_cords:
+
+            cords = input(question).split()
+
+            # Проверим, что введено именно два знака координат
+            if len(cords) != 2:
+                print(' Введите 2 координаты! ')
+                continue
+
+            row, col = cords
+
+            # Проверим, что эти два знака являются числами
+            if not (row.isdigit()) or not (col.isdigit()):
+                print(' Введите числа! ')
+                continue
+
+            row, col = int(row), int(col)
+
+            # Проверим, что координаты попали в игровое поле
+            if 0 > row or row > Game.FIELD_SIZE() or 0 > col or col > Game.FIELD_SIZE():
+                print(' Координаты вне игрового поля! ')
+                continue
+
+            valid_cords = True
+
+        return row, col
 
     def __create_ship(self, decks_num):
 
@@ -316,32 +370,12 @@ class HumansField(Field):
             elif created_decks == 2:
                 current_deck = 'третьей'
 
-            cords = input(f'Введите координаты {current_deck} палубы корабля (номер строки - пробел - номер колонки): ').split()
-
-            # Проверим, что введено именно два знака координат
-            if len(cords) != 2:
-                print(' Введите 2 координаты! ')
-                continue
-
-            row, col = cords
-
-            # Проверим, что эти два знака являются числами
-            if not (row.isdigit()) or not (col.isdigit()):
-                print(' Введите числа! ')
-                continue
-
-            row, col = int(row), int(col)
-
-            # Проверим, что координаты попали в игровое поле
-            if 0 > row or row > Game.FIELD_SIZE() or 0 > col or col > Game.FIELD_SIZE():
-                print(' Координаты вне игрового поля! ')
-                continue
+            row, col = self.input_cell(current_deck)
 
             # Проверим, не попал ли пользователь в какой-то другой корабль
             if self.check_ships_hit(row, col):
                 print('В этой клетке уже стоит палуба корабля или она граничит с какой-то палубой.  Выберите другую')
                 continue
-
 
             # Пройдемся по списку доступных зон размещения кораблей и проверим, входит ли выбранная пользователем ячейка
             # хотя бы в одну зону
@@ -392,6 +426,36 @@ class HumansField(Field):
 
         print('Отлично! корабли заняли свои места на поле!')
 
+    def shot(self, skynet_field):
+
+        row, col = self.input_cell()
+
+        # Заполним список доступных ходов
+        shot_var = skynet_field.possible_ships_areas(1, True)
+
+        correct_shot = None
+        while correct_shot is None:
+            for area in shot_var:
+                for cell in area:
+                    if cell.hit(row, col):
+                        if cell.status == '*':
+                            print('Есть попадание! Так держать!')
+                            cell.status_public = 'X'
+
+                        else:
+                            print('Промах!')
+                            cell.status_public = 'T'
+
+                    # Пользователь ткнул куда-то повторно
+                    else:
+                        print('В это поле уже стреляли. Сделай выстрел в другое поле')
+                        continue
+
+            correct_shot = True
+
+        # Покажем результат выстрела
+        game.show_fields()
+
 class SkynetField(Field):
 
     def __create_ship(self, decks_num):
@@ -430,7 +494,7 @@ class SkynetField(Field):
             self.__create_ship(1)
 
         print('')
-        print('Компьютер к игре готов!')
+        print('Компьютер расставил свои корабли и к игре готов!')
         print('')
 
         game.show_fields()
@@ -457,7 +521,8 @@ class Game:
     """
 
     def __init__(self):
-        pass
+        self.__humans_field = []
+        self.__skynet_field = []
 
     # Вводим константу для определения количества полей игрового поля
     @staticmethod
@@ -494,13 +559,19 @@ class Game:
         indent = ['          ']
         field_base = [[" "] * Game.FIELD_SIZE() + indent + [" "] * Game.FIELD_SIZE()for i in range(Game.FIELD_SIZE())]
 
-        for x, ships_row in enumerate(self.__skynet_field.ships_area_list):
-            for y, cell in enumerate(ships_row):
-                field_base[x][y] = cell.status
+        # for x, ships_row in enumerate(self.__humans_field.ships_area_list):
+        #     for y, cell in enumerate(ships_row):
+        #         field_base[x][y] = cell.status
 
-        for x, ships_row in enumerate(self.__skynet_field.ships_area_list):
-            for y, cell in enumerate(ships_row):
-                field_base[x][y+7] = cell.status
+        # Если поле еще не заполнялось - выводить нечего
+        if self.__skynet_field:
+            for x, ships_row in enumerate(self.__skynet_field.ships_area_list):
+                for y, cell in enumerate(ships_row):
+                    field_base[x][y+7] = cell.status_public
+
+            for x, ships_row in enumerate(self.__skynet_field.ships_area_list):
+                for y, cell in enumerate(ships_row):
+                    field_base[x][y] = cell.status
 
         print('     Мое поле                             Поле компьютера')
         print('    | 1 | 2 | 3 | 4 | 5 | 6 |            | 1 | 2 | 3 | 4 | 5 | 6 |')
@@ -517,12 +588,26 @@ class Game:
         Game.greet()
 
         #Создадим игровое поле человека
-        # self.__humans_field = HumansField(Game.FIELD_SIZE())
-        # self.__humans_field.fill_ships()
+        self.__humans_field = HumansField(Game.FIELD_SIZE())
+        self.__humans_field.fill_ships()
 
         # Создадим игровое поле компа
         self.__skynet_field = SkynetField(Game.FIELD_SIZE())
         self.__skynet_field.fill_ships()
+
+        game_over = False
+        current_field = self.__humans_field
+        current_enemys_field = self.__skynet_field
+        while not game_over:
+
+            current_field.shot(current_enemys_field)
+            current_field.shot(current_enemys_field)
+            current_field.shot(current_enemys_field)
+            current_field.shot(current_enemys_field)
+            current_field.shot(current_enemys_field)
+
+            game_over = True
+
 
 
 if __name__ == '__main__':
