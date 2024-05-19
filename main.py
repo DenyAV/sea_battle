@@ -19,6 +19,10 @@ class Cell:
         * - живой корабль
         Х - подбитый корабль
         Т - промах
+        - - граница корабля (клетка, которая примыкает к кораблю сбоку или по диагонали)
+
+    status_public : str
+        Указывает состояние клетки, которое видит противник (только результаты ходов - попадания и промахи)
 
     Методы
     -----------
@@ -33,11 +37,13 @@ class Cell:
         self.__set_status(status)
         self.__set_status_public(status_public)
 
-    def __eq__(self, other):
-        return (self.__row == other.__row) and (self.__col == other.__col)
-
-    # Внутренняя функция. Устанавливает координаты клетки. Вызывается конструктором класса
     def __set_cords(self, row: int, col: int):
+        """
+        Устанавливает координаты клетки. Вызывается конструктором класса
+        :param row: Номер строки
+        :param col: Номер колонки
+        :return: None
+        """
         self.__row = row
         self.__col = col
         # todo
@@ -224,6 +230,12 @@ class Field:
                     if cell.status == ' ':
                         cell.status = '-'
 
+    def delete_ship_borders(self):
+        for line in self.__ships_area_list:
+            for cell in line:
+                if cell.status == '-':
+                    cell.status = ' '
+
     def check_ships_hit(self, row, col):
 
         for curr_ship in self.ships:
@@ -290,6 +302,27 @@ class Field:
 
         return ships_areas
 
+    def all_ships_sunk(self):
+
+        thats_all = True
+        for ship in self.__ships_list:
+            for deck in ship.decks:
+                if deck.status_public == ' ':
+                    thats_all = False
+                    break
+
+        return thats_all
+
+    def alive_decks_num(self):
+
+        alive_decks = 0
+        for ship in self.__ships_list:
+            for deck in ship.decks:
+                if deck.status_public == ' ':
+                    alive_decks += 1
+
+        return alive_decks
+
 class HumansField(Field):
     """
     Представляет собой игровое поле человека
@@ -304,6 +337,14 @@ class HumansField(Field):
     fill_ships()
         Заполняет игровое поле кораблями
     """
+
+    @staticmethod
+    def victory_speech():
+        """
+        Заготовка речи на случай победы человека
+        :return: -> Текст речи
+        """
+        return 'Ура! Ты победил!! Все корабли противника потоплены. Роботы не захватят этот мир!'
 
     def input_cell(self, current_deck=None):
 
@@ -424,39 +465,51 @@ class HumansField(Field):
         for i in range(3):
             self.__create_ship(1)
 
+        self.delete_ship_borders()
         print('Отлично! корабли заняли свои места на поле!')
 
     def shot(self, skynet_field):
-
-        row, col = self.input_cell()
 
         # Заполним список доступных ходов
         shot_var = skynet_field.possible_ships_areas(1, True)
 
         correct_shot = None
         while correct_shot is None:
+
+            row, col = self.input_cell()
+
             for area in shot_var:
                 for cell in area:
                     if cell.hit(row, col):
                         if cell.status == '*':
                             print('Есть попадание! Так держать!')
                             cell.status_public = 'X'
-
+                            correct_shot = True
                         else:
                             print('Промах!')
                             cell.status_public = 'T'
+                            correct_shot = False
 
-                    # Пользователь ткнул куда-то повторно
-                    else:
-                        print('В это поле уже стреляли. Сделай выстрел в другое поле')
-                        continue
+                        break
 
-            correct_shot = True
+            # Пользователь ткнул куда-то повторно
+            if correct_shot is None:
+                print('В это поле уже стреляли. Сделай выстрел в другое поле')
+
+            continue
 
         # Покажем результат выстрела
         game.show_fields()
 
 class SkynetField(Field):
+
+    @staticmethod
+    def victory_speech():
+        """
+        Заготовка речи на случай победы компьютера
+        :return: текст речи
+        """
+        return 'Компьютер в этот раз победил. Собирайся с силами и приходи брать реванш!'
 
     def __create_ship(self, decks_num):
 
@@ -497,6 +550,27 @@ class SkynetField(Field):
         print('Компьютер расставил свои корабли и к игре готов!')
         print('')
 
+        game.show_fields()
+
+    def shot(self, humans_field):
+
+        print('Выстрел компьютера:')
+
+        # Заполним список доступных ходов
+        shot_var = humans_field.possible_ships_areas(1, True)
+
+        area = random.choice(shot_var)
+        for cell in area:
+            if cell.status == '*':
+                print('Есть попадание в твой корабль!')
+                cell.status_public = 'X'
+                cell.status = 'X'
+            else:
+                print('Компьютер промазал!')
+                cell.status_public = 'T'
+                cell.status = 'T'
+
+        # Покажем результат выстрела
         game.show_fields()
 
 class Game:
@@ -559,21 +633,24 @@ class Game:
         indent = ['          ']
         field_base = [[" "] * Game.FIELD_SIZE() + indent + [" "] * Game.FIELD_SIZE()for i in range(Game.FIELD_SIZE())]
 
-        # for x, ships_row in enumerate(self.__humans_field.ships_area_list):
-        #     for y, cell in enumerate(ships_row):
-        #         field_base[x][y] = cell.status
+        for x, ships_row in enumerate(self.__humans_field.ships_area_list):
+            for y, cell in enumerate(ships_row):
+                field_base[x][y] = cell.status
+        humans_alive_decks_num = self.__humans_field.alive_decks_num()
 
         # Если поле еще не заполнялось - выводить нечего
+        skynet_alive_decks_num = 0
         if self.__skynet_field:
             for x, ships_row in enumerate(self.__skynet_field.ships_area_list):
                 for y, cell in enumerate(ships_row):
                     field_base[x][y+7] = cell.status_public
+            skynet_alive_decks_num = self.__skynet_field.alive_decks_num()
 
-            for x, ships_row in enumerate(self.__skynet_field.ships_area_list):
-                for y, cell in enumerate(ships_row):
-                    field_base[x][y] = cell.status
+            # for x, ships_row in enumerate(self.__skynet_field.ships_area_list):
+            #     for y, cell in enumerate(ships_row):
+            #         field_base[x][y] = cell.status
 
-        print('     Мое поле                             Поле компьютера')
+        print(f'     Мои корабли (живых палуб - {humans_alive_decks_num})         Корабли компьютера (живых палуб - {skynet_alive_decks_num})')
         print('    | 1 | 2 | 3 | 4 | 5 | 6 |            | 1 | 2 | 3 | 4 | 5 | 6 |')
         print('  ---------------------------         ---------------------------- ')
         for i, row in enumerate(field_base):
@@ -601,12 +678,14 @@ class Game:
         while not game_over:
 
             current_field.shot(current_enemys_field)
-            current_field.shot(current_enemys_field)
-            current_field.shot(current_enemys_field)
-            current_field.shot(current_enemys_field)
-            current_field.shot(current_enemys_field)
 
-            game_over = True
+            if current_enemys_field.all_ships_sunk():
+                game_over = True
+                print(current_field.victory_speech())
+                break
+
+            current_field, current_enemys_field = current_enemys_field, current_field
+
 
 
 
