@@ -849,10 +849,6 @@ class Game:
                     field_base[x][y+7] = cell.status_public
             skynet_alive_decks_num = self.__skynet_field.alive_decks_num()
 
-            # for x, ships_row in enumerate(self.__skynet_field.ships_area_list):
-            #     for y, cell in enumerate(ships_row):
-            #         field_base[x][y] = cell.status
-
         print(f'     Мои корабли (живых палуб - {humans_alive_decks_num})         Корабли компьютера (живых палуб - {skynet_alive_decks_num})')
         print('    | 1 | 2 | 3 | 4 | 5 | 6 |            | 1 | 2 | 3 | 4 | 5 | 6 |')
         print('  ---------------------------         ---------------------------- ')
